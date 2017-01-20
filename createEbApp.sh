@@ -19,6 +19,9 @@ function setVariables {
     # ElasticBeanstalk region
     ebRegion="us-east-1"
 
+    # Application name
+    appName="meteorapp"
+
     # Email for reports
     email="dmitriy@kagarlickij.com"
 }
@@ -69,19 +72,18 @@ function installSoftware {
 
     # Install basic software
     apt-get -qq install -y gcc g++ make curl python2.7 tree ssmtp
+    ln -s /usr/bin/python2.7 /usr/bin/python
 
     # Check Docker
     which docker
     if [ $? -ne 0 ]; then {
         # Install Docker
+        apt-get -qq update
         apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
-        echo "deb https://apt.dockerproject.org/repo ubuntu-trusty main" > /etc/apt/sources.list.d/docker.list
+        apt-add-repository 'deb https://apt.dockerproject.org/repo ubuntu-xenial main'
         apt-get -qq update
-        apt-get -qq purge lxc-docker
         apt-cache policy docker-engine
-        apt-get -qq update
-        apt-get -qq install linux-image-extra-$(uname -r) -y
-        apt-get -qq install docker-engine -y
+        apt-get -qq install -y docker-engine
 
         # Check installed Docker
         which docker
@@ -175,7 +177,7 @@ function installSoftware {
         ./configure
         make
         make install
-
+        
         # Check installed Node
         which node
         if [ $? -ne 0 ]; then {
@@ -326,32 +328,61 @@ function setLogins {
     }
     fi
 
-    # Install BitBucket key
-    if [ -f ~/.ssh/bitBucketDeployKey4meteorapp1 ]; then {
-        diff "${secretFolder}""/bitBucketDeployKey4meteorapp1" ~/.ssh/bitBucketDeployKey4meteorapp1 > "${tmpLog}"
+    # Install GitHub deploy key
+    if [ -f ~/.ssh/GitHub_meteor_deploy ]; then {
+        diff "${secretFolder}""/GitHub_meteor_deploy" ~/.ssh/GitHub_meteor_deploy > "${tmpLog}"
         if [[ $(find "${tmpLog}" -type f -size +1c) ]]; then {
-            rm -f ~/.ssh/bitBucketDeployKey4meteorapp1
-            cp "${secretFolder}""/bitBucketDeployKey4meteorapp1" ~/.ssh
-            chmod 600 ~/.ssh/bitBucketDeployKey4meteorapp1
-            echo ["$(date +"%d-%b %T %Z %z")"] "BitBucket login has been replaced" >> "${mainLog}"
+            rm -f ~/.ssh/GitHub_meteor_deploy
+            cp "${secretFolder}""/GitHub_meteor_deploy" ~/.ssh
+            chmod 600 ~/.ssh/GitHub_meteor_deploy
+            echo ["$(date +"%d-%b %T %Z %z")"] "GitHub login has been replaced" >> "${mainLog}"
         }
         fi
     }
     else {
-        cp "${secretFolder}""/bitBucketDeployKey4meteorapp1" ~/.ssh
-        chmod 600 ~/.ssh/bitBucketDeployKey4meteorapp1
-        echo ["$(date +"%d-%b %T %Z %z")"] "BitBucket login has been copied" >> "${mainLog}"
+        cp "${secretFolder}""/GitHub_meteor_deploy" ~/.ssh
+        chmod 600 ~/.ssh/GitHub_meteor_deploy
+        echo ["$(date +"%d-%b %T %Z %z")"] "GitHub login has been copied" >> "${mainLog}"
     }
     fi
 
-    # Check BitBucket key
-    diff "${secretFolder}""/bitBucketDeployKey4meteorapp1" ~/.ssh/bitBucketDeployKey4meteorapp1 > "${tmpLog}"
+    # Check GitHub deploy key
+    diff "${secretFolder}""/GitHub_meteor_deploy" ~/.ssh/GitHub_meteor_deploy > "${tmpLog}"
     if [[ $(find "${tmpLog}" -type f -size +1c) ]]; then {
         errorsCounter="$[$errorsCounter +1]"
-        echo ["$(date +"%d-%b %T %Z %z")"] "BitBucket login has been checked with error" >> "${mainLog}"
+        echo ["$(date +"%d-%b %T %Z %z")"] "GitHub login has been checked with error" >> "${mainLog}"
     }
     else {
-        echo ["$(date +"%d-%b %T %Z %z")"] "BitBucket login has been checked successfully" >> "${mainLog}"
+        echo ["$(date +"%d-%b %T %Z %z")"] "GitHub login has been checked successfully" >> "${mainLog}"
+    }
+    fi
+
+    # Set local Git config
+    if [ -f ~/.ssh/config ]; then {
+        diff "${secretFolder}""/config" ~/.ssh/config > "${tmpLog}"
+        if [[ $(find "${tmpLog}" -type f -size +1c) ]]; then {
+            rm -f ~/.ssh/config
+            cp "${secretFolder}""/config" ~/.ssh
+            chmod 600 ~/.ssh/config
+            echo ["$(date +"%d-%b %T %Z %z")"] "Local Git config has been replaced" >> "${mainLog}"
+        }
+        fi
+    }
+    else {
+        cp "${secretFolder}""/config" ~/.ssh
+        chmod 600 ~/.ssh/config
+        echo ["$(date +"%d-%b %T %Z %z")"] "Local Git config has been copied" >> "${mainLog}"
+    }
+    fi
+
+    # Check local Git config
+    diff "${secretFolder}""/config" ~/.ssh/config > "${tmpLog}"
+    if [[ $(find "${tmpLog}" -type f -size +1c) ]]; then {
+        errorsCounter="$[$errorsCounter +1]"
+        echo ["$(date +"%d-%b %T %Z %z")"] "Local Git config has been checked with error" >> "${mainLog}"
+    }
+    else {
+        echo ["$(date +"%d-%b %T %Z %z")"] "Local Git config has been checked successfully" >> "${mainLog}"
     }
     fi
 
@@ -466,7 +497,7 @@ function createEbApp {
     fi
 
     # Create Eb Application
-    cd "${ebTmp}" && eb init meteorapp --region "${ebRegion}" --platform Docker --verbose > "${tmpLog}"
+    cd "${ebTmp}" && eb init "${appName}" --region "${ebRegion}" --platform Docker --verbose > "${tmpLog}"
 
     # Function end time
     functionEndTime=$(date +"%s")
